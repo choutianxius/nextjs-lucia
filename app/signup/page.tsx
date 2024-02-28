@@ -1,9 +1,9 @@
 'use client';
 import { useFormState } from 'react-dom';
-import { signUp as _signUp, type SignUpResult } from '@/app/_lib/actions';
+import { signUp as _signUp, type ActionResult } from '@/app/_lib/actions';
 
 export default async function Page() {
-  const [state, signUp] = useFormState<SignUpResult, FormData>(_signUp, undefined);
+  const [state, signUp] = useFormState<ActionResult, FormData>(_signUp, undefined);
   return (
     <>
       <h1>Create Account</h1>

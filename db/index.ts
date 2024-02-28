@@ -1,8 +1,13 @@
 import sqlite from 'better-sqlite3';
 
-const SQLITE_DB_PATH = process.env?.SQLITE_DB_PATH ?? './db/main.db';
-
+// somehow, the path is relative to the base url of the project
 const db = sqlite('./db/main.db');
 db.pragma('journal_mode = WAL');
 
 export default db;
+
+export interface DBUser {
+  id: string;
+  username: string;
+  hashed_password: string;
+};

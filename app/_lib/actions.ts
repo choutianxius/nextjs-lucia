@@ -1,13 +1,10 @@
 'use server';
-import db from '@/db';
+import db, { type DBUser } from '@/db';
 import { Argon2id } from 'oslo/password';
 import { cookies } from 'next/headers';
-import { lucia } from '@/auth';
+import { lucia, validateRequest } from '@/auth';
 import { redirect } from 'next/navigation';
 import { generateId } from 'lucia';
-import { cache } from 'react';
-
-import type { Session, User } from 'lucia';
 
 export type ActionResult = {
   error: string;
@@ -57,7 +54,6 @@ export const signUp = async (currState: ActionResult, formData: FormData): Promi
     const session = await lucia.createSession(userId, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
     cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
-    console.log('here');
 
   } catch (e) {
     console.error(e);
@@ -69,32 +65,6 @@ export const signUp = async (currState: ActionResult, formData: FormData): Promi
   redirect('/me');
 }
 
-export const validateRequest = cache(
-	async (): Promise<{ user: User; session: Session } | { user: null; session: null }> => {
-		const sessionId = cookies().get(lucia.sessionCookieName)?.value ?? null;
-		if (!sessionId) {
-			return {
-				user: null,
-				session: null
-			};
-		}
-
-		const result = await lucia.validateSession(sessionId);
-		// next.js throws when you attempt to set cookie when rendering page
-		try {
-			if (result.session && result.session.fresh) {
-				const sessionCookie = lucia.createSessionCookie(result.session.id);
-				cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
-			}
-			if (!result.session) {
-				const sessionCookie = lucia.createBlankSessionCookie();
-				cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
-			}
-		} catch {}
-		return result;
-	}
-);
-
 export const signOut = async (): Promise<ActionResult> => {
   const { session } = await validateRequest();
   if (!session) return ({ error: 'Unauthorized' });
@@ -105,7 +75,7 @@ export const signOut = async (): Promise<ActionResult> => {
   redirect('/');
 }
 
-async function login(_: any, formData: FormData): Promise<ActionResult> {
+export const signIn = async (_: any, formData: FormData): Promise<ActionResult> => {
 	const username = formData.get('username');
 	if (
 		typeof username !== 'string' ||
@@ -126,7 +96,7 @@ async function login(_: any, formData: FormData): Promise<ActionResult> {
 
 	const existingUser = db
 		.prepare('SELECT * FROM user where username = ?')
-    .get(username) as User;
+    .get(username) as DBUser;
 
 	if (!existingUser) {
 		// NOTE:
@@ -143,7 +113,7 @@ async function login(_: any, formData: FormData): Promise<ActionResult> {
 		};
 	}
 
-	const validPassword = await new Argon2id().verify(existingUser.password, password);
+	const validPassword = await new Argon2id().verify(existingUser.hashed_password, password);
 	if (!validPassword) {
 		return {
 			error: 'Incorrect username or password',
@@ -153,6 +123,6 @@ async function login(_: any, formData: FormData): Promise<ActionResult> {
 	const session = await lucia.createSession(existingUser.id, {});
 	const sessionCookie = lucia.createSessionCookie(session.id);
 	cookies().set(sessionCookie.name, sessionCookie.value, sessionCookie.attributes);
-	return redirect('/');
+	redirect('/me');
 }
 
